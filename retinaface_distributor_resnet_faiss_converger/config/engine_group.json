@@ -1,0 +1,111 @@
+[
+    {
+        "graph_id": 0,
+        "device_id": 0,
+        "graph_name": "retinaface",
+        "elements": [
+            {
+                "element_id": 5000,
+                "element_config": "../retinaface_distributor_resnet_faiss_converger/config/decode.json",
+                "ports": {
+                    "input": [
+                        {
+                            "port_id": 0,
+                            "is_sink": false,
+                            "is_src": true
+                        }
+                    ]
+                }
+            },
+            {
+                "element_id": 5001,
+                "element_config": "../retinaface_distributor_resnet_faiss_converger/config/retinaface_group.json",
+                "inner_elements_id": [10001, 10002, 10003]
+            },
+            {
+                "element_id": 5004,
+                "element_config": "../retinaface_distributor_resnet_faiss_converger/config/distributor_frame_class.json"
+            },
+            {
+                "element_id": 5010,
+                "element_config": "../retinaface_distributor_resnet_faiss_converger/config/osd.json"
+            },
+            {
+                "element_id": 5005,
+                "element_config": "../retinaface_distributor_resnet_faiss_converger/config/converger.json"
+            },
+            {
+                "element_id": 5011,
+                "element_config": "../retinaface_distributor_resnet_faiss_converger/config/http_push.json",
+                "ports": {
+                    "output": [
+                        {
+                            "port_id": 0,
+                            "is_sink": true,
+                            "is_src": false
+                        }
+                    ]
+                }
+            },
+            {
+                "element_id": 5006,
+                "element_config": "../retinaface_distributor_resnet_faiss_converger/config/resnet_face.json"
+            },
+            {
+                "element_id": 5007,
+                "element_config": "../retinaface_distributor_resnet_faiss_converger/config/faiss.json"
+            }
+        ],
+        "connections": [
+            {
+                "src_element_id": 5000,
+                "src_port": 0,
+                "dst_element_id": 5001,
+                "dst_port": 0
+            },
+            {
+                "src_element_id": 5001,
+                "src_port": 0,
+                "dst_element_id": 5004,
+                "dst_port": 0
+            },
+            {
+                "src_element_id": 5004,
+                "src_port": 1,
+                "dst_element_id": 5006,
+                "dst_port": 0
+            }
+            ,
+            {
+                "src_element_id": 5006,
+                "src_port": 0,
+                "dst_element_id": 5007,
+                "dst_port": 0
+            },
+            {
+                "src_element_id": 5007,
+                "src_port": 0,
+                "dst_element_id": 5005,
+                "dst_port": 1
+            },
+            {
+                "src_element_id": 5004,
+                "src_port": 0,
+                "dst_element_id": 5005,
+                "dst_port": 0
+            },
+            {
+                "src_element_id": 5005,
+                "src_port": 0,
+                "dst_element_id": 5010,
+                "dst_port": 0
+            },
+            {
+                "src_element_id": 5010,
+                "src_port": 0,
+                "dst_element_id": 5011,
+                "dst_port": 0
+            }
+        ]
+    }
+]

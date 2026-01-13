@@ -1,0 +1,11 @@
+{
+    "configure": {
+        "db_path":"/data/sophon-stream-master/samples/retinaface_distributor_resnet_faiss_converger/data/face_data/faiss_db_data.txt",
+        "label_path":"/data/sophon-stream-master/samples/retinaface_distributor_resnet_faiss_converger/data/face_data/faiss_index_label.name",
+        "similarity_threshold": 0.3
+    },
+    "shared_object": "../../build/lib/libfaiss.so",
+    "name": "faiss",
+    "side": "sophgo",
+    "thread_number": 1
+}

@@ -1,0 +1,11 @@
+{
+  "configure": {
+    "osd_type": "ALGORITHM",
+    "draw_utils": "BMCV",
+    "draw_func_name": "draw_retinaface_distributor_resnet_faiss_converger_results"
+  },
+  "shared_object": "../../build/lib/libosd.so",
+  "name": "osd",
+  "side": "sophgo",
+  "thread_number": 1
+}

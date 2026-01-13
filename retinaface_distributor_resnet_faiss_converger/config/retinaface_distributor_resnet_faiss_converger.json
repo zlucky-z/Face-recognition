@@ -1,0 +1,13 @@
+{
+  "channels": [
+    {
+      "channel_id": 2,
+      "url": "/data/sophon-stream-master/samples/retinaface_distributor_resnet_faiss_converger/face_test2.mp4",
+      "source_type": "VIDEO",
+      "loop_num": 2,
+      "sample_interval": 3,
+      "fps": 10
+    }
+  ],
+  "engine_config_path": "../retinaface_distributor_resnet_faiss_converger/config/engine_group.json"
+}

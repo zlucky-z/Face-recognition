@@ -1,0 +1,22 @@
+{
+  "configure": {
+    "model_path": "../retinaface_distributor_resnet_faiss_converger/data/models/BM1688/resnet_arcface_fp32_1b.bmodel",
+    "bgr2rgb": true,
+    "bgr2gray": true,
+    "task_type": "FeatureExtract",
+    "mean": [
+      127.5,
+      127.5,
+      127.5
+    ],
+    "std": [
+      127.5,
+      127.5,
+      127.5
+    ]
+  },
+  "shared_object": "../../build/lib/libresnet.so",
+  "name": "resnet",
+  "side": "sophgo",
+  "thread_number": 1
+}
