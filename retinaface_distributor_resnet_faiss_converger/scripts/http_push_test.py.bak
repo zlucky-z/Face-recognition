@@ -1,0 +1,168 @@
+import json
+import base64
+import os
+from flask import Flask, request, jsonify, render_template, send_file
+from PIL import Image
+from io import BytesIO
+import time
+from collections import OrderedDict
+
+app = Flask(__name__)
+
+# 配置
+SIMILARITY_THRESHOLD = 0.3  # 阈值，score大于等于此值为正常识别，否则为unknown
+IMAGE_QUALITY = 85           # 人脸图片压缩质量
+FACE_SIZE = (720, 540)       # 统一的人脸图片大小
+
+@app.route('/')
+def index():
+    """前端页面入口"""
+    return render_template('main.html')
+
+@app.route('/latest_img')
+def get_latest_image():
+    """获取最新帧图像和元数据"""
+    try:
+        with open('latest_frame.json', 'r') as f:
+            frame_data = json.load(f)
+        return jsonify({
+            "img": frame_data['mFrame']['mSpData'],
+            "metadata": frame_data
+        })
+    except Exception:
+        return jsonify({"img": "", "metadata": {}}), 404
+
+@app.route('/latest_labels')
+def get_latest_labels():
+    """获取最新帧的标签统计数据"""
+    try:
+        with open('latest_frame.json', 'r') as f:
+            frame_data = json.load(f)
+
+        labels = []
+        face_indices = []
+        similarities = []
+
+        faces = frame_data.get('mFaceObjectMetadata', [])
+        subs = frame_data.get('mSubObjectMetadatas', [])
+
+        for i, face in enumerate(faces):
+            label = f"face_{i+1}"
+            similarity = float(face.get('score', 0))
+            if i < len(subs):
+                recog_objs = subs[i].get('mRecognizedObjectMetadatas', [])
+                if recog_objs:
+                    recog = recog_objs[0]
+                    label = recog.get('mLabelName', label)
+                    if 'mScores' in recog and recog['mScores']:
+                        similarity = float(recog['mScores'][0])
+            if similarity >= SIMILARITY_THRESHOLD:
+                labels.append(label)
+            else:
+                labels.append("unknown")
+            face_indices.append(i)
+            similarities.append(similarity)
+
+        return jsonify({
+            "labels": labels,
+            "frameId": frame_data['mFrame']['mFrameId'],
+            "faceIndices": face_indices,
+            "similarities": similarities
+        })
+    except Exception as e:
+        print(f'latest_labels error: {e}')
+        return jsonify({"labels": [], "frameId": 0, "faceIndices": [], "similarities": []})
+
+@app.route('/get_face_image/<int:frame_id>/<int:face_index>')
+def get_face_image(frame_id, face_index):
+    try:
+        # 直接读取文件
+        with open('latest_frame.json', 'r') as f:
+            frame_data = json.load(f)
+        if frame_data['mFrame']['mFrameId'] != frame_id:
+            return jsonify({"image": ""}), 404
+        faces = frame_data.get('mFaceObjectMetadata', [])
+        if len(faces) <= face_index:
+            return jsonify({"image": ""}), 404
+        sp_data = frame_data['mFrame']['mSpData']
+        if not sp_data:
+            return jsonify({"image": ""}), 404
+        img_data = base64.b64decode(sp_data)
+        img = Image.open(BytesIO(img_data))
+        face = faces[face_index]
+        left = int(face.get('left', 0))
+        top = int(face.get('top', 0))
+        right = int(face.get('right', 0))
+        bottom = int(face.get('bottom', 0))
+        if right <= left or bottom <= top:
+            return jsonify({"image": ""}), 400
+        img_width, img_height = img.size
+        left = max(0, min(left, img_width - 1))
+        top = max(0, min(top, img_height - 1))
+        right = max(0, min(right, img_width))
+        bottom = max(0, min(bottom, img_height))
+        if right <= left or bottom <= top:
+            return jsonify({"image": ""}), 400
+        face_img = img.crop((left, top, right, bottom))
+        face_img = face_img.resize(FACE_SIZE, Image.Resampling.LANCZOS)
+        buffered = BytesIO()
+        face_img.save(buffered, format="JPEG", quality=IMAGE_QUALITY)
+        face_b64 = base64.b64encode(buffered.getvalue()).decode("utf-8")
+        return jsonify({"image": face_b64})
+    except Exception as e:
+        print(f"裁剪人脸失败: Frame {frame_id}, Face {face_index} - {str(e)}")
+        return jsonify({"image": ""}), 500
+
+@app.route('/stream/test', methods=['POST'])
+def stream_test():
+    """接收视频帧数据"""
+    try:
+        data = json.loads(request.data.decode('utf-8'))
+        frame_id = data.get('mFrame', {}).get('mFrameId')
+        if not frame_id:
+            return jsonify({"status": "error", "message": "Missing frame ID"}), 400
+        with open('latest_frame.json', 'w') as f:
+            json.dump(data, f)
+        return jsonify({"status": "success", "frameId": frame_id})
+    except Exception as e:
+        print(f"处理帧数据失败: {str(e)}")
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+@app.route('/video/<path:filename>')
+def serve_video(filename):
+    """提供视频文件服务"""
+    try:
+        video_path = os.path.join('/data/sophon-stream-master/samples/retinaface_distributor_resnet_faiss_converger', filename)
+        if os.path.exists(video_path):
+            return send_file(video_path, mimetype='video/mp4')
+        return jsonify({"error": "Video file not found"}), 404
+    except Exception as e:
+        print(f"提供视频文件失败: {str(e)}")
+        return jsonify({"error": str(e)}), 500
+
+@app.errorhandler(404)
+def page_not_found(e):
+    return jsonify({"error": "Resource not found"}), 404
+
+@app.errorhandler(500)
+def internal_server_error(e):
+    return jsonify({"error": "Internal server error"}), 500
+
+def cleanup_old_frames():
+    try:
+        if os.path.exists('latest_frame.json'):
+            # 只保留最新的几帧
+            with open('latest_frame.json', 'r') as f:
+                frame_data = json.load(f)
+            # 清理旧数据
+            if 'mFrame' in frame_data:
+                frame_data['mFrame']['mSpData'] = ""  # 清空图像数据
+            with open('latest_frame.json', 'w') as f:
+                json.dump(frame_data, f)
+    except Exception as e:
+        print(f"清理旧帧数据失败: {e}")
+
+if __name__ == '__main__':
+    # 确保上传的图片有足够的内存空间
+    app.config['MAX_CONTENT_LENGTH'] = 50 * 1024 * 1024  # 50MB
+    app.run(host='0.0.0.0', port=8030, debug=True)

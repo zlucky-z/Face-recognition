@@ -1,0 +1,1080 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>人脸识别结果展示</title>
+    
+    <!-- Font Awesome CSS -->
+    <link rel="stylesheet" href="/static/css/fontawesome.min.css">
+    
+    <!-- Tailwind CSS -->
+    <script src="/static/js/tailwindcss.min.js"></script>
+    
+    <!-- Chart.js -->
+    <script src="/static/js/chart.umd.min.js"></script>
+
+    <!-- Tailwind配置 -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            if (typeof tailwind !== 'undefined') {
+                tailwind.config = {
+                    theme: {
+                        extend: {
+                            colors: {
+                                primary: '#165DFF',
+                                secondary: '#FF7D00',
+                                success: '#00B42A',
+                                warning: '#FF7D00',
+                                danger: '#F53F3F',
+                                dark: '#1D2129',
+                                light: '#F2F3F5'
+                            },
+                            fontFamily: {
+                                inter: ['Inter', 'system-ui', 'sans-serif'],
+                            },
+                        },
+                    }
+                }
+            }
+        });
+    </script>
+
+    <!-- 基础样式 -->
+    <style>
+        /* 自定义样式 */
+        .gradient-bg {
+            background: linear-gradient(135deg, #165DFF 0%, #0040C9 100%);
+        }
+        
+        .card-shadow {
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+        }
+        
+        .card-hover {
+            transition: all 0.3s ease;
+        }
+        
+        .card-hover:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 8px 30px rgba(0, 0, 0, 0.12);
+        }
+        
+        .animate-fade-in {
+            animation: fade-in 0.4s cubic-bezier(.4,2,.6,1);
+        }
+        
+        @keyframes fade-in {
+            from { opacity: 0; transform: translateY(20px) scale(0.98); }
+            to { opacity: 1; transform: translateY(0) scale(1); }
+        }
+    </style>
+</head>
+
+<body class="font-inter bg-gray-50 text-dark min-h-screen flex flex-col">
+    <!-- 顶部导航栏 -->
+    <header class="gradient-bg text-white shadow-md sticky top-0 z-50">
+        <div class="container mx-auto px-4 py-3 flex justify-between items-center">
+            <div class="flex items-center space-x-2">
+                <i class="fa-solid fa-id-card text-2xl"></i>
+                <h1 class="text-xl font-bold">智能人脸识别</h1>
+            </div>
+            <div class="flex items-center space-x-4">
+                <button id="startTaskBtn" class="bg-white/20 hover:bg-white/30 px-4 py-2 rounded-lg transition-all duration-300 flex items-center">
+                    <i class="fa-solid fa-play mr-2"></i>
+                    <span>开始任务</span>
+                </button>
+                <!-- 任务状态提示 -->
+                <div id="taskStatusIndicator" class="bg-white/20 px-4 py-2 rounded-lg flex items-center hidden">
+                    <i id="statusIcon" class="fa-solid fa-info-circle mr-2"></i>
+                    <span id="statusText">准备就绪</span>
+                </div>
+                <button id="settingsBtn"
+                    class="bg-white/20 hover:bg-white/30 p-2 rounded-lg transition-all duration-300">
+                    <i class="fa-solid fa-cog"></i>
+                </button>
+                <a href="/logout" class="bg-white/20 hover:bg-white/30 px-4 py-2 rounded-lg transition-all duration-300 flex items-center">
+                    <i class="fa-solid fa-sign-out-alt mr-2"></i>
+                    <span>退出登录</span>
+                </a>
+            </div>
+        </div>
+    </header>
+
+    <!-- 主内容区 -->
+    <main class="flex-grow container mx-auto px-4 py-6">
+        <!-- 状态卡片 -->
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+            <div class="bg-white rounded-xl p-6 card-shadow card-hover animate-fade-in">
+                <div class="flex justify-between items-start">
+                    <div>
+                        <p class="text-gray-500 text-sm">当前识别</p>
+                        <h3 class="text-3xl font-bold mt-1" id="totalRecognitions">0</h3>
+                        <p class="text-success flex items-center mt-2 text-sm">
+                            <i class="fa-solid fa-arrow-up mr-1"></i> <span id="recognitionIncrease">0</span>% 较昨日
+                        </p>
+                    </div>
+                    <div class="bg-primary/10 p-3 rounded-lg">
+                        <i class="fa-solid fa-user-circle text-primary text-xl"></i>
+                    </div>
+                </div>
+            </div>
+
+            <div class="bg-white rounded-xl p-6 card-shadow card-hover animate-fade-in" style="animation-delay: 0.1s">
+                <div class="flex justify-between items-start">
+                    <div>
+                        <p class="text-gray-500 text-sm">识别准确率</p>
+                        <h3 class="text-3xl font-bold mt-1" id="accuracyRate">0%</h3>
+                        <p class="text-success flex items-center mt-2 text-sm">
+                            <i class="fa-solid fa-arrow-up mr-1"></i> <span id="accuracyIncrease">0</span>% 较昨日
+                        </p>
+                    </div>
+                    <div class="bg-success/10 p-3 rounded-lg">
+                        <i class="fa-solid fa-check-circle text-success text-xl"></i>
+                    </div>
+                </div>
+            </div>
+
+            <div class="bg-white rounded-xl p-6 card-shadow card-hover animate-fade-in" style="animation-delay: 0.2s">
+                <div class="flex justify-between items-start">
+                    <div>
+                        <p class="text-gray-500 text-sm">识别耗时</p>
+                        <h3 class="text-3xl font-bold mt-1" id="avgTime">0 ms</h3>
+                        <p class="text-danger flex items-center mt-2 text-sm">
+                            <i class="fa-solid fa-arrow-down mr-1"></i> <span id="timeDecrease">0</span>% 较昨日
+                        </p>
+                    </div>
+                    <div class="bg-warning/10 p-3 rounded-lg">
+                        <i class="fa-solid fa-clock text-warning text-xl"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 主要内容区 -->
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <!-- 左侧：原始图像和识别结果 -->
+            <div class="lg:col-span-2 space-y-6">
+                <!-- 原始图像和人脸框 -->
+                <div class="bg-white rounded-xl p-6 card-shadow animate-fade-in">
+                    <h2 class="text-lg font-bold mb-4 flex items-center">
+                        <i class="fa-solid fa-image text-primary mr-2"></i>
+                        识别结果
+                    </h2>
+                    <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4" id="faceGrid">
+                        <!-- 人脸图片将在这里动态添加 -->
+                    </div>
+                    <div class="mt-4 text-center text-gray-500 text-sm">
+                        <i class="fa-solid fa-info-circle mr-1"></i> 任务运行时系统自动更新识别结果，请耐心等待
+                    </div>
+                </div>
+
+                <!-- 识别详情表格 -->
+                <div class="bg-white rounded-xl p-6 card-shadow animate-fade-in">
+                    <h2 class="text-lg font-bold mb-4 flex items-center">
+                        <i class="fa-solid fa-list-alt text-primary mr-2"></i>
+                        识别详情
+                    </h2>
+                    <div class="overflow-x-auto">
+                        <table class="min-w-full divide-y divide-gray-200">
+                            <thead>
+                                <tr>
+                                    <th
+                                        class="px-4 py-3 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                        人脸</th>
+                                    <th
+                                        class="px-4 py-3 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                        识别结果</th>
+                                    <th
+                                        class="px-4 py-3 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                        识别次数</th>
+                                    <th
+                                        class="px-4 py-3 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                        操作</th>
+                                </tr>
+                            </thead>
+                            <tbody id="recognitionTableBody">
+                                <tr>
+                                    <td colspan="4" class="px-4 py-6 text-center text-gray-500">
+                                        <div class="flex flex-col items-center">
+                                            <i class="fa-solid fa-info-circle text-2xl mb-2 text-gray-400"></i>
+                                            <p>暂无识别数据</p>
+                                            <p class="text-xs mt-1">请耐心等待</p>
+                                        </div>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- 最近识别记录 -->
+                <div class="bg-white rounded-xl p-6 card-shadow animate-fade-in">
+                    <h2 class="text-lg font-bold mb-4 flex items-center">
+                        <i class="fa-solid fa-history text-primary mr-2"></i>
+                        最近识别记录
+                    </h2>
+                    <div id="recentRecords" class="space-y-3 max-h-80 overflow-y-auto pr-2">
+                        <div class="text-center py-6 text-gray-500">
+                            <i class="fa-solid fa-clock-rotate-left text-3xl mb-2 text-gray-400"></i>
+                            <p>暂无识别记录</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 系统设置 -->
+                <div class="bg-white rounded-xl p-6 card-shadow animate-fade-in">
+                    <h2 class="text-lg font-bold mb-4 flex items-center">
+                        <i class="fa-solid fa-sliders text-primary mr-2"></i>
+                        系统设置
+                    </h2>
+                    <div class="space-y-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">相似度阈值</label>
+                            <div class="flex items-center">
+                                <input type="range" id="similarityThreshold" min="0" max="100" value="30"
+                                    class="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-primary">
+                                <span id="thresholdValue" class="ml-2 text-sm font-medium text-gray-700">30%</span>
+                            </div>
+                        </div>
+
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">特征库更新</label>
+                            <button id="updateDbBtn"
+                                class="w-full py-2 bg-primary text-white rounded-md hover:bg-primary/90 transition-colors">
+                                <i class="fa-solid fa-database mr-2"></i>更新特征库
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 右侧：视频播放和文件列表 -->
+            <div class="space-y-6">
+                <!-- 视频播放区域 -->
+                <div class="bg-white rounded-xl p-6 card-shadow animate-fade-in">
+                    <h2 class="text-lg font-bold mb-4 flex items-center">
+                        <i class="fa-solid fa-video text-primary mr-2"></i>
+                        识别视频
+                    </h2>
+                    <div class="relative aspect-video bg-gray-100 rounded-lg overflow-hidden">
+                        <video id="localVideo" class="w-full h-full object-contain" controls>
+                            <source src="" type="video/mp4">
+                            您的浏览器不支持视频播放
+                        </video>
+                        <div id="videoLoading" class="absolute inset-0 flex items-center justify-center bg-gray-900/50 hidden">
+                            <div class="text-white">
+                                <i class="fa-solid fa-spinner fa-spin text-2xl"></i>
+                                <p class="mt-2">加载中...</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="mt-4 flex items-center justify-between">
+                        <div class="flex items-center space-x-2">
+                            <button id="playVideoBtn" class="px-4 py-2 bg-primary text-white rounded-md hover:bg-primary/90 transition-colors">
+                                <i class="fa-solid fa-play mr-2"></i>播放视频
+                            </button>
+                            <button id="pauseVideoBtn" class="px-4 py-2 bg-yellow-200 text-yellow-700 rounded-md hover:bg-yellow-300 transition-colors">
+                                <i class="fa-solid fa-pause mr-2"></i>暂停
+                            </button>
+                            <button id="stopVideoBtn" class="px-4 py-2 bg-gray-200 text-gray-700 rounded-md hover:bg-gray-300 transition-colors">
+                                <i class="fa-solid fa-stop mr-2"></i>停止
+                            </button>
+                        </div>
+                        <div class="text-sm text-gray-500">
+                            <i class="fa-solid fa-info-circle mr-1"></i>
+                            支持MP4格式视频
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 视频文件列表 -->
+                <div class="bg-white rounded-xl p-6 card-shadow animate-fade-in">
+                    <h2 class="text-lg font-bold mb-4 flex items-center">
+                        <i class="fa-solid fa-file-video text-primary mr-2"></i>
+                        视频文件列表
+                    </h2>
+                    <div class="mb-4">
+                        <div class="flex items-center space-x-2">
+                            <input type="text" id="videoPath" 
+                                class="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
+                                placeholder="输入视频文件路径" 
+                                value="/data/sophon-stream-master/samples/retinaface_distributor_resnet_faiss_converger">
+                            <button id="refreshFileListBtn" class="px-4 py-2 bg-primary text-white rounded-md hover:bg-primary/90 transition-colors">
+                                <i class="fa-solid fa-refresh mr-2"></i>刷新
+                            </button>
+                        </div>
+                    </div>
+                    <div id="fileList" class="space-y-2 max-h-80 overflow-y-auto pr-2">
+                        <div class="text-center py-6 text-gray-500">
+                            <i class="fa-solid fa-folder-open text-3xl mb-2 text-gray-400"></i>
+                            <p>暂无视频文件</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- 页脚 -->
+    <footer class="bg-dark text-white py-6 mt-8">
+        <div class="container mx-auto px-4">
+            <div class="flex flex-col md:flex-row justify-between items-center">
+                <div class="mb-4 md:mb-0">
+                    <p class="text-sm">&copy; 2025 人脸识别系统 - 版权所有</p>
+                </div>
+                <div class="flex space-x-4">
+                    <a href="#" class="text-gray-300 hover:text-white transition-colors">
+                        <i class="fa-solid fa-question-circle"></i>
+                        <span class="ml-1">帮助</span>
+                    </a>
+                    <a href="#" class="text-gray-300 hover:text-white transition-colors">
+                        <i class="fa-solid fa-file-text"></i>
+                        <span class="ml-1">文档</span>
+                    </a>
+                    <a href="#" class="text-gray-300 hover:text-white transition-colors">
+                        <i class="fa-solid fa-envelope"></i>
+                        <span class="ml-1">联系我们</span>
+                    </a>
+                </div>
+            </div>
+        </div>
+    </footer>
+
+    <!-- 模态框 -->
+    <div id="detailModal" class="fixed inset-0 bg-black/50 flex items-center justify-center z-50 hidden">
+        <div class="bg-white rounded-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto animate-fade-in">
+            <div class="p-6 border-b">
+                <div class="flex justify-between items-center">
+                    <h3 class="text-xl font-bold" id="modalTitle">识别详情</h3>
+                    <button id="closeModal" class="text-gray-500 hover:text-gray-700">
+                        <i class="fa-solid fa-times"></i>
+                    </button>
+                </div>
+            </div>
+            <div class="p-6" id="modalContent">
+                <div class="text-center py-8 text-gray-500">
+                    <i class="fa-solid fa-exclamation-circle text-4xl mb-3 text-gray-400"></i>
+                    <h4 class="font-medium">暂无识别详情</h4>
+                    <p class="mt-2">请确保后端已开启人脸识别功能并返回识别数据</p>
+                </div>
+            </div>
+            <div class="p-6 border-t flex justify-end">
+                <button id="closeModalBtn"
+                    class="px-4 py-2 bg-gray-200 text-gray-700 rounded-md hover:bg-gray-300 transition-colors">
+                    关闭
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let recognitionChart;
+        let labelBestFaceMap = {};
+        let autoRefreshInterval = null;  // 自动刷新定时器
+        let isTaskRunning = false;       // 任务运行状态
+
+        // 获取最新图像数据
+        async function fetchLatestImage() {
+            try {
+                const response = await fetch("/latest_img");
+                if (!response.ok) return false;
+                
+                const data = await response.json();
+                if (!data.img) return false;
+                
+                return true;
+            } catch (error) {
+                console.error("获取图片失败:", error);
+                return false;
+            }
+        }
+
+        // 获取标签统计数据并更新界面
+        async function fetchLabelStatistics() {
+            try {
+                const response = await fetch("/latest_labels");
+                const { labels, frameId, faceIndices, similarities, detectionCounts } = await response.json();
+
+                // 更新今日识别数量
+                document.getElementById('totalRecognitions').textContent = labels.length;
+
+                // 更新最近识别记录
+                updateRecentRecords(labels);
+
+                // 更新识别详情表格
+                await updateRecognitionTable(labels, frameId, faceIndices, similarities, detectionCounts);
+
+                // 更新识别统计图表
+                updateRecognitionChart(labels);
+
+                // 更新人脸网格 - 使用新的获取已确认人脸的方法
+                await updateFaceGridWithConfirmedFaces();
+
+            } catch (error) {
+                console.error("获取标签统计失败:", error);
+            }
+        }
+
+        // 新增：获取并显示已确认的人脸
+        async function updateFaceGridWithConfirmedFaces() {
+            try {
+                const response = await fetch("/get_confirmed_faces");
+                const data = await response.json();
+                
+                const faceGrid = document.getElementById('faceGrid');
+                faceGrid.innerHTML = '';
+                
+                if (data.status === 'success' && data.confirmedFaces.length > 0) {
+                    // 额外过滤掉unknown，确保万无一失
+                    const validFaces = data.confirmedFaces.filter(face => face.label !== "unknown");
+                    
+                    if (validFaces.length > 0) {
+                        validFaces.forEach(face => {
+                            const card = document.createElement('div');
+                            card.className = 'face-card bg-white rounded-lg overflow-hidden shadow-md hover:shadow-lg transition-shadow duration-300';
+                            card.innerHTML = `
+                                <div class="relative aspect-square">
+                                    <img src="data:image/jpeg;base64,${face.image}" 
+                                         alt="${face.label}" 
+                                         class="w-full h-full object-cover face-image">
+                                    <div class="absolute bottom-0 left-0 right-0 bg-black/50 text-white p-2">
+                                        <div class="text-sm font-medium">${face.label}</div>
+                                        <div class="text-xs">相似度: ${(face.similarity * 100).toFixed(1)}%</div>
+                                        <div class="text-xs">检测次数: ${face.detectionCount}</div>
+                                    </div>
+                                </div>
+                            `;
+                            faceGrid.appendChild(card);
+                        });
+                    } else {
+                        faceGrid.innerHTML = `
+                            <div class="col-span-full text-center py-8 text-gray-500">
+                                <i class="fa-solid fa-face-smile text-4xl mb-3 text-gray-400"></i>
+                                <p>暂无识别结果</p>
+                                <p class="text-sm mt-2">待系统任务启动后显示</p>
+                            </div>
+                        `;
+                    }
+                } else {
+                    faceGrid.innerHTML = `
+                        <div class="col-span-full text-center py-8 text-gray-500">
+                            <i class="fa-solid fa-face-smile text-4xl mb-3 text-gray-400"></i>
+                            <p>暂无识别结果</p>
+                            <p class="text-sm mt-2">待系统启动任务后显示</p>
+                        </div>
+                    `;
+                }
+            } catch (error) {
+                console.error("获取已确认人脸失败:", error);
+            }
+        }
+
+        // 开启自动刷新
+        function startAutoRefresh() {
+            if (autoRefreshInterval) {
+                clearInterval(autoRefreshInterval);
+            }
+            
+            // 每2秒刷新一次
+            autoRefreshInterval = setInterval(async () => {
+                if (isTaskRunning) {
+                    await fetchLatestImage();
+                    await fetchLabelStatistics();
+                }
+            }, 2000);
+            
+            console.log('自动刷新已开启');
+        }
+
+        // 停止自动刷新
+        function stopAutoRefresh() {
+            if (autoRefreshInterval) {
+                clearInterval(autoRefreshInterval);
+                autoRefreshInterval = null;
+            }
+            console.log('自动刷新已停止');
+        }
+
+        // 更新最近识别记录
+        function updateRecentRecords(labels) {
+            const recentRecords = document.getElementById('recentRecords');
+            if (labels.length === 0) {
+                recentRecords.innerHTML = `
+                    <div class="text-center py-6 text-gray-500">
+                        <i class="fa-solid fa-clock-rotate-left text-3xl mb-2 text-gray-400"></i>
+                        <p>暂无识别记录</p>
+                    </div>
+                `;
+            } else {
+                recentRecords.innerHTML = labels.map(label => `
+                    <div class="flex items-center space-x-2">
+                        <i class="fa-solid fa-user text-primary"></i>
+                        <span>${label}</span>
+                    </div>
+                `).join('');
+            }
+        }
+
+        // 更新识别详情表格
+        function updateRecognitionTable(labels, frameId, faceIndices, similarities, detectionCounts) {
+            const tableBody = document.getElementById('recognitionTableBody');
+            const labelCounts = {};
+            // 统计标签出现次数
+            labels.forEach((label, index) => {
+                if (!labelCounts[label]) {
+                    labelCounts[label] = {
+                        count: 0,
+                        maxSimilarity: 0,
+                        bestFaceIndex: -1
+                    };
+                }
+                labelCounts[label].count++;
+                if (similarities[index] > labelCounts[label].maxSimilarity) {
+                    labelCounts[label].maxSimilarity = similarities[index];
+                    labelCounts[label].bestFaceIndex = faceIndices[index];
+                }
+            });
+            // 新增：暴露全局最佳图片映射
+            labelBestFaceMap = {};
+            Object.entries(labelCounts).forEach(([label, data]) => {
+                labelBestFaceMap[label] = {
+                    faceIndex: data.bestFaceIndex,
+                    similarity: data.maxSimilarity
+                };
+            });
+            if (Object.keys(labelCounts).length === 0) {
+                tableBody.innerHTML = `
+                    <tr>
+                        <td colspan="4" class="px-4 py-6 text-center text-gray-500">
+                            <div class="flex flex-col items-center">
+                                <i class="fa-solid fa-info-circle text-2xl mb-2 text-gray-400"></i>
+                                <p>暂无识别数据</p>
+                            </div>
+                        </td>
+                    </tr>
+                `;
+                return;
+            }
+            tableBody.innerHTML = '';
+            Object.entries(labelCounts).forEach(([label, data]) => {
+                tableBody.innerHTML += `
+                    <tr class="hover:bg-gray-50">
+                        <td class="px-4 py-3">
+                            <div class="h-10 w-10 rounded-full overflow-hidden">
+                                <img src="https://via.placeholder.com/40x40?text=无图片" 
+                                     alt="${label}" 
+                                     class="h-full w-full object-cover face-image">
+                            </div>
+                        </td>
+                        <td class="px-4 py-3">${label}</td>
+                        <td class="px-4 py-3">${data.count}</td>
+                        <td class="px-4 py-3">
+                            <button class="text-primary hover:text-primary/80" onclick="showFaceDetail('${label}', ${data.count}, ${data.maxSimilarity})">
+                                查看详情
+                            </button>
+                        </td>
+                    </tr>
+                `;
+            });
+        }
+
+        // 加载所有人脸图片 - 简化版本
+        async function loadAllFaceImages(frameId, faceIndices) {
+            // 由于现在使用confirmed_faces，这个函数可以简化或保持为空
+            return Promise.resolve();
+        }
+
+        // 初始化识别统计图表
+        function initRecognitionChart() {
+            const ctx = document.getElementById('recognitionChart').getContext('2d');
+            
+            // 销毁可能存在的旧图表
+            if (recognitionChart) {
+                recognitionChart.destroy();
+            }
+            
+            // 创建新图表
+            recognitionChart = new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    labels: ['未知'],
+                    datasets: [{
+                        data: [1],
+                        backgroundColor: [
+                            '#E5E7EB', // 灰色（默认）
+                        ],
+                        borderWidth: 0
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'bottom',
+                            labels: {
+                                boxWidth: 12,
+                                padding: 15
+                            }
+                        },
+                        title: {
+                            display: true,
+                            text: '识别结果分布',
+                            font: {
+                                size: 14
+                            }
+                        }
+                    },
+                    cutout: '65%'
+                }
+            });
+        }
+
+        // 更新识别统计图表
+        function updateRecognitionChart(labels) {
+            if (!recognitionChart) return;
+            
+            // 统计标签频率
+            const labelCounts = {};
+            labels.forEach(label => {
+                labelCounts[label] = (labelCounts[label] || 0) + 1;
+            });
+
+            // 处理数据
+            const chartLabels = Object.keys(labelCounts);
+            const chartData = Object.values(labelCounts);
+            
+            // 动态生成颜色
+            const colors = [
+                '#00B42A', // 绿色
+                '#FF7D00', // 橙色
+                '#165DFF', // 蓝色
+                '#F53F3F', // 红色
+                '#722ED1', // 紫色
+                '#EBAA16', // 黄色
+                '#0FC6C2', // 青色
+            ];
+            
+            // 根据标签数量循环使用颜色
+            const backgroundColors = chartLabels.map((_, index) => 
+                colors[index % colors.length]
+            );
+
+            // 更新图表数据
+            recognitionChart.data.labels = chartLabels.length > 0 ? chartLabels : ['未知'];
+            recognitionChart.data.datasets[0].data = chartData.length > 0 ? chartData : [1];
+            recognitionChart.data.datasets[0].backgroundColor = backgroundColors;
+            
+            // 更新图表
+            recognitionChart.update();
+        }
+
+        // 初始化页面
+        async function initPage() {
+            bindEventListeners();
+            await fetchLatestImage();
+            initRecognitionChart();
+            await fetchLabelStatistics();
+            updateStats();
+            
+            // 初始化任务状态
+            await checkTaskStatus();
+        }
+
+        // 更新统计数据（使用默认值或模拟数据）
+        function updateStats(data) {
+            document.getElementById('totalRecognitions').textContent = '0';
+            document.getElementById('accuracyRate').textContent = '0%';
+            document.getElementById('avgTime').textContent = '0 ms';
+            document.getElementById('recognitionIncrease').textContent = '0';
+            document.getElementById('accuracyIncrease').textContent = '0';
+            document.getElementById('timeDecrease').textContent = '0';
+        }
+
+        // 绘制人脸框（禁用此功能）
+        function drawFaceBoxes() {
+            const ctx = document.getElementById('faceCanvas').getContext('2d');
+            ctx.clearRect(0, 0, faceCanvas.width, faceCanvas.height);
+        }
+
+        // 显示人脸详情模态框
+        function showFaceDetail(label, count, similarity) {
+            const modalTitle = document.getElementById('modalTitle');
+            const modalContent = document.getElementById('modalContent');
+
+            modalTitle.textContent = `识别详情 - ${label}`;
+            modalContent.innerHTML = `
+                <div class="grid grid-cols-1 gap-4">
+                    <div>
+                        <p class="font-medium">识别结果：${label}</p>
+                        <p>识别次数：${count} 次</p>
+                        <p>最高相似度：${(similarity * 100).toFixed(1)}%</p>
+                    </div>
+                </div>
+            `;
+
+            document.getElementById('detailModal').classList.remove('hidden');
+        }
+
+        // 文件列表相关功能
+        async function loadFileList() {
+            const path = document.getElementById('videoPath').value;
+            try {
+                const response = await fetch(`/list_videos?path=${encodeURIComponent(path)}`);
+                const data = await response.json();
+                const fileList = document.getElementById('fileList');
+                
+                if (data.files && data.files.length > 0) {
+                    fileList.innerHTML = data.files.map(file => `
+                        <div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors cursor-pointer video-file-item"
+                             data-path="${file.path}">
+                            <div class="flex items-center space-x-3">
+                                <i class="fa-solid fa-file-video text-primary"></i>
+                                <span class="text-sm">${file.name}</span>
+                            </div>
+                            <button class="text-primary hover:text-primary/80 text-sm select-video-btn">
+                                选择
+                            </button>
+                        </div>
+                    `).join('');
+
+                    // 添加文件选择事件监听
+                    document.querySelectorAll('.select-video-btn').forEach(btn => {
+                        btn.addEventListener('click', async (e) => {
+                            e.stopPropagation();
+                            const fileItem = btn.closest('.video-file-item');
+                            const filePath = fileItem.dataset.path;
+                            await updateVideoSource(filePath);
+                        });
+                    });
+                } else {
+                    fileList.innerHTML = `
+                        <div class="text-center py-6 text-gray-500">
+                            <i class="fa-solid fa-folder-open text-3xl mb-2 text-gray-400"></i>
+                            <p>暂无视频文件</p>
+                        </div>
+                    `;
+                }
+            } catch (error) {
+                console.error('加载文件列表失败:', error);
+                showNotification('加载文件列表失败', 'danger');
+            }
+        }
+
+        // 更新视频源
+        async function updateVideoSource(filePath) {
+            try {
+                // 更新配置文件
+                const response = await fetch('/update_config', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ video_path: filePath })
+                });
+
+                if (!response.ok) {
+                    throw new Error('更新配置失败');
+                }
+
+                // 更新视频播放器
+                const video = document.getElementById('localVideo');
+                video.src = `/video/${filePath.split('/').pop()}`;
+                video.load();
+
+                showNotification('视频源更新成功', 'success');
+            } catch (error) {
+                console.error('更新视频源失败:', error);
+                showNotification('更新视频源失败', 'danger');
+            }
+        }
+
+        // 绑定事件监听器
+        function bindEventListeners() {
+            // 开始任务按钮事件
+            document.getElementById('startTaskBtn').addEventListener('click', startTask);
+
+            // 相似度阈值滑块
+            document.getElementById('similarityThreshold').addEventListener('input', function (e) {
+                document.getElementById('thresholdValue').textContent = `${e.target.value}%`;
+            });
+
+            // 关闭模态框
+            document.getElementById('closeModal').addEventListener('click', () => {
+                document.getElementById('detailModal').classList.add('hidden');
+            });
+            document.getElementById('closeModalBtn').addEventListener('click', () => {
+                document.getElementById('detailModal').classList.add('hidden');
+            });
+
+            // 更新特征库按钮
+            document.getElementById('updateDbBtn').addEventListener('click', function () {
+                this.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-2"></i>更新中...';
+                this.disabled = true;
+                setTimeout(() => {
+                    this.innerHTML = '<i class="fa-solid fa-check mr-2"></i>更新成功';
+                    this.classList.remove('bg-primary');
+                    this.classList.add('bg-success');
+                    setTimeout(() => {
+                        this.innerHTML = '<i class="fa-solid fa-database mr-2"></i>更新特征库';
+                        this.classList.remove('bg-success');
+                        this.classList.add('bg-primary');
+                        this.disabled = false;
+                    }, 2000);
+                    showNotification('特征库更新成功', 'success');
+                }, 3000);
+            });
+
+            // 刷新文件列表按钮
+            document.getElementById('refreshFileListBtn').addEventListener('click', loadFileList);
+
+            // 初始加载文件列表
+            loadFileList();
+
+            // 检查任务状态并更新按钮
+            checkTaskStatus();
+            
+            // 定期检查任务状态（每5秒检查一次）
+            setInterval(checkTaskStatus, 5000);
+        }
+
+        // 更新任务状态指示器
+        function updateTaskStatusIndicator(status, isRunning, isCompleted = false) {
+            const indicator = document.getElementById('taskStatusIndicator');
+            const icon = document.getElementById('statusIcon');
+            const text = document.getElementById('statusText');
+            const startBtn = document.getElementById('startTaskBtn');
+            
+            // 显示状态指示器
+            indicator.classList.remove('hidden');
+            
+            if (isRunning) {
+                icon.className = 'fa-solid fa-spinner fa-spin mr-2 text-yellow-300';
+                text.textContent = '检测任务运行中...';
+                indicator.className = 'bg-yellow-500/20 px-4 py-2 rounded-lg flex items-center';
+                startBtn.disabled = true;
+                startBtn.classList.add('opacity-50', 'cursor-not-allowed');
+            } else if (isCompleted) {
+                icon.className = 'fa-solid fa-check-circle mr-2 text-green-300';
+                text.textContent = '检测任务已完成';
+                indicator.className = 'bg-green-500/20 px-4 py-2 rounded-lg flex items-center';
+                startBtn.disabled = false;
+                startBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+            } else {
+                icon.className = 'fa-solid fa-circle-pause mr-2 text-gray-300';
+                text.textContent = '准备就绪';  
+                indicator.className = 'bg-white/20 px-4 py-2 rounded-lg flex items-center';
+                startBtn.disabled = false;
+                startBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+            }
+        }
+
+        // 检查任务状态并更新按钮
+        async function checkTaskStatus() {
+            try {
+                const response = await fetch('/task_status');
+                const data = await response.json();
+                const startBtn = document.getElementById('startTaskBtn');
+                
+                if (data.is_running) {
+                    // 任务正在运行
+                    startBtn.disabled = true;
+                    isTaskRunning = true;
+                    updateTaskStatusIndicator('running', true, false);
+                    startAutoRefresh();
+                } else if (data.was_running && !data.is_running) {
+                    // 任务刚刚完成（之前在运行，现在停止了）
+                    if (isTaskRunning) {
+                        // 自动清理并提示任务完成
+                        await autoCleanupAfterCompletion();
+                    }
+                    startBtn.disabled = false;
+                    isTaskRunning = false;
+                    updateTaskStatusIndicator('completed', false, true);
+                    stopAutoRefresh();
+                } else {
+                    // 任务未运行
+                    startBtn.disabled = false;
+                    isTaskRunning = false;
+                    updateTaskStatusIndicator('ready', false, false);
+                    stopAutoRefresh();
+                }
+            } catch (e) {
+                console.error('检查任务状态失败:', e);
+                // 发生错误时，确保开始按钮可用
+                const startBtn = document.getElementById('startTaskBtn');
+                startBtn.disabled = false;
+                isTaskRunning = false;
+                updateTaskStatusIndicator('ready', false, false);
+                stopAutoRefresh();
+            }
+        }
+
+        // 任务完成后自动清理
+        async function autoCleanupAfterCompletion() {
+            try {
+                const response = await fetch('/auto_cleanup', {method: 'POST'});
+                const data = await response.json();
+                if (response.ok) {
+                    showNotification('检测任务已完成，系统已自动清理资源', 'success', 5000);
+                    console.log('任务自动清理完成');
+                } else {
+                    console.warn('自动清理失败:', data.message);
+                }
+            } catch (e) {
+                console.error('自动清理失败:', e);
+            }
+        }
+
+        // 启动任务
+        async function startTask() {
+            const startBtn = document.getElementById('startTaskBtn');
+            startBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-2"></i><span>启动中...</span>';
+            try {
+                const response = await fetch('/start_task', {method: 'POST'});
+                const data = await response.json();
+                if (response.ok) {
+                    showNotification(data.message, 'success');
+                    startBtn.disabled = true;
+                    
+                    // 设置任务运行状态并开启自动刷新
+                    isTaskRunning = true;
+                    updateTaskStatusIndicator('running', true, false);
+                    startAutoRefresh();
+                    
+                    setTimeout(() => {
+                        showNotification('检测任务正在执行，系统会自动更新识别结果', 'info');
+                    }, 2000);
+                } else {
+                    showNotification(data.message || '启动任务失败', 'danger');
+                    startBtn.disabled = false;
+                }
+            } catch (e) {
+                showNotification('启动任务失败', 'danger');
+                startBtn.disabled = false;
+            } finally {
+                startBtn.innerHTML = '<i class="fa-solid fa-play mr-2"></i><span>开始任务</span>';
+            }
+        }
+
+        // 闪电蓝右上角弹窗
+        function showNotification(message, type = 'info', duration = 3000) {
+            let container = document.getElementById('notification-container');
+            if (!container) {
+                container = document.createElement('div');
+                container.id = 'notification-container';
+                container.style = 'position:fixed;top:32px;right:32px;z-index:9999;display:flex;flex-direction:column;gap:14px;align-items:flex-end;';
+                document.body.appendChild(container);
+            }
+            const colorMap = {
+                success: 'from-cyan-400 to-blue-600',
+                danger: 'from-pink-500 to-red-600',
+                info: 'from-blue-400 to-cyan-500',
+                warning: 'from-yellow-400 to-yellow-600'
+            };
+            const iconMap = {
+                success: '⚡',
+                danger: '⛔',
+                info: '⚡',
+                warning: '⚡'
+            };
+            const notification = document.createElement('div');
+            notification.className = `relative min-w-[200px] max-w-sm px-5 py-3 rounded-2xl shadow-xl text-white text-base flex items-center gap-2 bg-gradient-to-br ${colorMap[type] || colorMap.info} border border-white/20 animate-fade-in`;
+            notification.style.transition = 'all 0.4s cubic-bezier(.4,2,.6,1)';
+            notification.style.opacity = '0';
+            notification.style.transform = 'translateY(-20px) scale(0.98)';
+            notification.innerHTML = `
+                <span class="text-xl animate-pulse drop-shadow">${iconMap[type] || iconMap.info}</span>
+                <span class="flex-1">${message}</span>
+                <button class="ml-2 text-white/80 hover:text-white text-lg focus:outline-none" style="background:transparent;border:none;cursor:pointer;">×</button>
+                <div class="absolute left-0 bottom-0 h-1 w-full bg-white/20 rounded-b-2xl overflow-hidden">
+                    <div class="h-full bg-white/80 transition-all duration-1000" style="width:100%"></div>
+                </div>
+            `;
+            // 动画淡入
+            setTimeout(() => {
+                notification.style.opacity = '1';
+                notification.style.transform = 'translateY(0) scale(1)';
+            }, 10);
+            // 进度条动画
+            setTimeout(() => {
+                const bar = notification.querySelector('div > div');
+                if (bar) bar.style.width = '0%';
+            }, 100);
+            // 关闭按钮
+            notification.querySelector('button').onclick = () => {
+                notification.style.opacity = '0';
+                notification.style.transform = 'translateX(40px) scale(0.98)';
+                setTimeout(() => notification.remove(), 400);
+            };
+            // 自动消失
+            setTimeout(() => {
+                if (document.body.contains(notification)) {
+                    notification.style.opacity = '0';
+                    notification.style.transform = 'translateX(40px) scale(0.98)';
+                    setTimeout(() => notification.remove(), 400);
+                }
+            }, duration);
+            container.appendChild(notification);
+        }
+
+        // 视频播放相关功能
+        document.addEventListener('DOMContentLoaded', function() {
+            const video = document.getElementById('localVideo');
+            const playBtn = document.getElementById('playVideoBtn');
+            const pauseBtn = document.getElementById('pauseVideoBtn');
+            const stopBtn = document.getElementById('stopVideoBtn');
+            const videoLoading = document.getElementById('videoLoading');
+            
+            // 设置视频源
+            video.src = '/video/test1.mp4';
+            
+            // 播放按钮事件
+            playBtn.addEventListener('click', function() {
+                videoLoading.classList.remove('hidden');
+                video.play().catch(function(error) {
+                    console.error('视频播放失败:', error);
+                    showNotification('视频播放失败，请检查视频文件', 'danger');
+                });
+            });
+            // 暂停按钮事件
+            pauseBtn.addEventListener('click', function() {
+                video.pause();
+            });
+            // 停止按钮事件
+            stopBtn.addEventListener('click', function() {
+                video.pause();
+                video.currentTime = 0;
+            });
+            // 视频加载完成
+            video.addEventListener('loadeddata', function() {
+                videoLoading.classList.add('hidden');
+            });
+            // 视频可播放时也隐藏loading（兼容性更好）
+            video.addEventListener('canplay', function() {
+                videoLoading.classList.add('hidden');
+            });
+            // 视频播放时也隐藏loading
+            video.addEventListener('play', function() {
+                videoLoading.classList.add('hidden');
+            });
+            // 视频错误处理
+            video.addEventListener('error', function() {
+                videoLoading.classList.add('hidden');
+                showNotification('视频加载失败，请检查视频文件', 'danger');
+            });
+        });
+
+        // 页面加载后初始化
+        window.addEventListener('DOMContentLoaded', initPage);
+        
+        // 页面卸载时清理定时器
+        window.addEventListener('beforeunload', function() {
+            stopAutoRefresh();
+        });
+    </script>
+</body>
+
+</html>

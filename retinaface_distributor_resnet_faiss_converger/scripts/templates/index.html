@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>最新图片展示</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f4f4f4;
+            text-align: center;
+            padding: 20px;
+        }
+
+        h2 {
+            color: #333;
+        }
+
+        #img {
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            padding: 5px;
+            width: 400px;
+            background-color: #fff;
+            box-shadow: 0 0 5px rgba(0, 0, 0, 0.1);
+        }
+
+        button {
+            background-color: #4CAF50;
+            border: none;
+            color: white;
+            padding: 10px 20px;
+            text-align: center;
+            text-decoration: none;
+            display: inline-block;
+            font-size: 16px;
+            margin: 20px 2px;
+            cursor: pointer;
+            border-radius: 4px;
+        }
+
+        button:hover {
+            background-color: #45a049;
+        }
+    </style>
+</head>
+
+<body>
+    <h2>最新图片</h2>
+    <img id="img" width="400" /><br />
+    <button onclick="refreshImg()">刷新</button>
+    <script>
+        function refreshImg() {
+            fetch('/latest_img').then(r => r.json()).then(d => {
+                if (d.img) {
+                    document.getElementById('img').src = "data:image/jpeg;base64," + d.img;
+                }
+            });
+        }
+        setInterval(refreshImg, 1000); // 每1秒刷新
+        refreshImg();
+    </script>
+</body>
+
+</html>
